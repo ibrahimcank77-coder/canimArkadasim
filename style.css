@@ -1,0 +1,40 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 45%, #0b2a33 0%, #05141a 60%, #020a0d 100%);
+  font-family: "Segoe UI", "Noto Sans", system-ui, -apple-system, sans-serif;
+}
+
+canvas { display: block; cursor: pointer; }
+
+#caption {
+  position: fixed;
+  left: 0; right: 0;
+  bottom: 7%;
+  text-align: center;
+  color: #9ff7ee;
+  font-size: clamp(16px, 3vw, 26px);
+  letter-spacing: 1px;
+  text-shadow: 0 0 12px rgba(64, 224, 208, 0.7);
+  opacity: 0;
+  transition: opacity 1.5s ease;
+  pointer-events: none;
+}
+
+#hint {
+  position: fixed;
+  left: 0; right: 0;
+  bottom: 2.5%;
+  text-align: center;
+  color: rgba(159, 247, 238, 0.35);
+  font-size: 12px;
+  opacity: 0;
+  transition: opacity 1.5s ease;
+  pointer-events: none;
+}
+
+body.done #caption { opacity: 1; }
+body.done #hint { opacity: 1; }

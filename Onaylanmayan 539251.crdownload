@@ -1,0 +1,187 @@
+// ====== AYARLAR ======
+const COLOR = "#40E0D0";        // turkuaz
+const COLOR_LIGHT = "#9ff7ee";  // Türkçe / Azerbaycanca / Rusça için daha parlak ton
+const APPEAR_MS = 2600;         // kelimelerin sırayla belirme süresi
+const FLY_MS = 1800;            // her kelimenin yerine uçma süresi
+
+// İlk üçü (Türkçe, Azerbaycanca, Rusça) her zaman en başta ve öne çıkarılmış olur
+const PHRASES = [
+  { text: "Seni seviyorum", main: true },   // Türkçe
+  { text: "Səni sevirəm", main: true },     // Azerbaycan dili
+  { text: "Я тебя люблю", main: true },     // Rusça
+  { text: "I love you" },
+  { text: "Te amo" },
+  { text: "Je t'aime" },
+  { text: "Ich liebe dich" },
+  { text: "Ti amo" },
+  { text: "Eu te amo" },
+  { text: "Ik hou van je" },
+  { text: "Kocham cię" },
+  { text: "Jag älskar dig" },
+  { text: "Я тебе кохаю" },   // Ukraynaca
+  { text: "Σ' αγαπώ" },
+  { text: "愛してる" },
+  { text: "사랑해" },
+  { text: "我爱你" },
+  { text: "أحبك" },
+  { text: "دوستت دارم" },
+  { text: "אני אוהב אותך" },
+  { text: "मैं तुमसे प्यार करता हूँ" },
+  { text: "ฉันรักเธอ" },
+  { text: "Мен сені сүйемін" }, // Kazakça
+  { text: "Seni sevaman" },     // Özbekçe
+  { text: "მიყვარხარ" },       // Gürcüce
+];
+// =====================
+
+const canvas = document.getElementById("heart");
+const ctx = canvas.getContext("2d");
+const FONT = '"Segoe UI","Noto Sans","Noto Sans Arabic","Noto Sans JP",system-ui,sans-serif';
+
+let W, H, S, cx, cy, words = [], startTime = 0, totalTime = 0, rafId = null;
+
+// Kalp denklemi: (x²+y²-1)³ - x²y³ <= 0
+function inside(x, y) {
+  const a = x * x + y * y - 1;
+  return a * a * a - x * x * y * y * y <= 0;
+}
+
+function toUnit(px, py) {
+  return [(px - cx) / S, (cy - py) / S + 0.1];
+}
+
+function build() {
+  const dpr = window.devicePixelRatio || 1;
+  W = window.innerWidth;
+  H = window.innerHeight;
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.width = W + "px";
+  canvas.style.height = H + "px";
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  S = Math.min((W * 0.92) / 2.3, (H * 0.74) / 2.2);
+  cx = W / 2;
+  cy = H * 0.46;
+
+  const fs = Math.max(11, Math.min(24, S * 0.085));
+  const rowH = fs * 1.6;
+  const top = cy - 1.1 * S;
+  const bottom = cy + 1.1 * S;
+  const gapMin = fs * 0.9;
+
+  words = [];
+  let idx = 0;
+  ctx.textBaseline = "middle";
+
+  const measure = (p) => {
+    ctx.font = `${p.main ? 700 : 500} ${fs}px ${FONT}`;
+    return ctx.measureText(p.text).width;
+  };
+
+  for (let py = top; py <= bottom; py += rowH) {
+    // Bu satırda metnin tamamen içinde kaldığı yatay aralıkları bul
+    const segs = [];
+    let start = null;
+    for (let px = cx - 1.25 * S; px <= cx + 1.25 * S; px += 2) {
+      const [x1, y1] = toUnit(px, py - fs * 0.55);
+      const [x2, y2] = toUnit(px, py + fs * 0.55);
+      const ok = inside(x1, y1) && inside(x2, y2);
+      if (ok && start === null) start = px;
+      if ((!ok || px + 2 > cx + 1.25 * S) && start !== null) {
+        segs.push([start + 4, px - 4]);
+        start = null;
+      }
+    }
+
+    for (const [a, b] of segs) {
+      const row = [];
+      let used = 0;
+      while (true) {
+        const p = PHRASES[idx % PHRASES.length];
+        const w = measure(p);
+        const need = used + w + (row.length ? gapMin : 0);
+        if (need > b - a) break;
+        row.push({ p, w });
+        used = need;
+        idx++;
+      }
+      if (!row.length) continue;
+
+      const sum = row.reduce((s, r) => s + r.w, 0);
+      let gap = row.length > 1 ? (b - a - sum) / (row.length - 1) : 0;
+      gap = Math.min(gap, fs * 2.2);
+      const total = sum + gap * (row.length - 1);
+      let x = a + (b - a - total) / 2;
+
+      for (const r of row) {
+        words.push({
+          text: r.p.text,
+          main: !!r.p.main,
+          fs,
+          tx: x + r.w / 2,
+          ty: py,
+          sx: W / 2 + (Math.random() - 0.5) * W * 1.1,
+          sy: H / 2 + (Math.random() - 0.5) * H * 1.1,
+        });
+        x += r.w + gap;
+      }
+    }
+  }
+
+  words.forEach((w, i) => (w.delay = (i / Math.max(1, words.length - 1)) * APPEAR_MS));
+  totalTime = APPEAR_MS + FLY_MS;
+}
+
+const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
+
+function frame(now) {
+  const t = now - startTime;
+  ctx.clearRect(0, 0, W, H);
+
+  // Animasyon bittikten sonra kalp atışı efekti
+  let pulse = 1;
+  if (t > totalTime) {
+    const k = (t - totalTime) / 1000;
+    pulse = 1 + 0.018 * Math.max(0, Math.sin(k * 5.2)) ** 3 * 2;
+    document.body.classList.add("done");
+  }
+
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.scale(pulse, pulse);
+  ctx.translate(-cx, -cy);
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+
+  for (const w of words) {
+    const lt = t - w.delay;
+    if (lt < 0) continue;
+    const p = easeOutCubic(Math.min(1, lt / FLY_MS));
+    const alpha = Math.min(1, lt / 400);
+    const x = w.sx + (w.tx - w.sx) * p;
+    const y = w.sy + (w.ty - w.sy) * p;
+
+    ctx.globalAlpha = alpha;
+    ctx.font = `${w.main ? 700 : 500} ${w.fs}px ${FONT}`;
+    ctx.fillStyle = w.main ? COLOR_LIGHT : COLOR;
+    ctx.shadowColor = COLOR;
+    ctx.shadowBlur = w.main ? 12 : 7;
+    ctx.fillText(w.text, x, y);
+  }
+  ctx.restore();
+
+  rafId = requestAnimationFrame(frame);
+}
+
+function start() {
+  cancelAnimationFrame(rafId);
+  document.body.classList.remove("done");
+  build();
+  startTime = performance.now();
+  rafId = requestAnimationFrame(frame);
+}
+
+window.addEventListener("resize", start);
+canvas.addEventListener("click", start);
+start();
